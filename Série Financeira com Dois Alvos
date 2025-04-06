@@ -1,0 +1,91 @@
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Definimos as variáveis principais
+N = 3000  # Número de bolas
+M = 30    # Número de pontos marcados
+passos_de_tempo = 1500  # Número de passos de tempo
+
+# Inicializa o estado do anel de Kac
+eta = np.ones(N)
+
+# Cria uma array de pontos marcados
+pontos_marcados = np.zeros(N)
+pontos_marcados[:M] = 1
+np.random.shuffle(pontos_marcados)
+
+# Definimos a função de evolução do anel de Kac
+def evol_anel_kac(N, M, passos_de_tempo, eta, pontos_marcados):
+    tempos = np.arange(passos_de_tempo)
+    delta_t = np.zeros(passos_de_tempo)
+
+    mu = M / N
+    evolucao_macro = (1 - 2 * mu) ** tempos
+
+    for t in range(passos_de_tempo):
+        novo_eta = np.zeros_like(eta)
+        for k in range(N):
+            novo_eta[k] = pontos_marcados[k] * -eta[k - 1] + (1 - pontos_marcados[k]) * eta[k - 1]
+        eta = novo_eta
+        delta_t[t] = np.mean(eta)
+
+    return tempos, evolucao_macro, delta_t
+
+# Função para mapear a evolução de Kac para uma série de preços com múltiplos alvos
+def map_to_prices_multiple(delta_t, preco_inicial, preco_intermediario, preco_final, frac_tempo):
+    num_passos = len(delta_t)
+    fase1_limite = int(frac_tempo * num_passos)  # Definindo o limite da primeira fase
+
+    # Normaliza o delta_t de forma contínua para evitar transições abruptas
+    delta_min, delta_max = np.min(delta_t), np.max(delta_t)
+    delta_normalized = (delta_t - delta_min) / (delta_max - delta_min)
+
+    # Primeira fase: Preço de preco_inicial a preco_intermediario
+    precos_fase1 = preco_inicial + (delta_normalized[:fase1_limite] * (preco_intermediario - preco_inicial))
+
+    # Segunda fase: Preço de preco_intermediario a preco_final
+    precos_fase2 = preco_intermediario + (delta_normalized[fase1_limite:] * (preco_final - preco_intermediario))
+
+    # Concatena as duas fases suavemente
+    precos = np.concatenate([precos_fase1, precos_fase2])
+
+    return precos
+
+# Parâmetros financeiros
+preco_inicial = 100
+preco_intermediario = 110
+preco_final = 120
+frac_tempo = 0.5              # Define a transição na metade do tempo
+
+# Executa a função de evolução do anel de Kac
+tempos, evolucao_macro, delta_t = evol_anel_kac(N, M, passos_de_tempo, eta, pontos_marcados)
+
+# Mapeia a evolução de Kac para os preços com dois alvos
+precos = map_to_prices_multiple(delta_t, preco_inicial, preco_intermediario, preco_final, frac_tempo)
+
+# Mapeia a evolução macro também para o intervalo de preços com dois alvos
+evolucao_macro_precos = map_to_prices_multiple(evolucao_macro, preco_inicial, preco_intermediario, preco_final, frac_tempo)
+
+# Plotando os resultados
+plt.figure(figsize=(20, 14))
+
+# Plotar a evolução macro do anel de Kac mapeada para os preços
+plt.plot(tempos, evolucao_macro_precos, label=r'Evolução macro (mapeada para preços)', color='blue')
+
+# Plotar a série de preços simulada
+plt.plot(tempos, precos, label=f'Série financeira: Preço de {preco_inicial} para {preco_intermediario} e depois {preco_final}', color='orange', alpha=0.7)
+
+# Adicionar intervalo de confiança ao redor da série financeira
+plt.fill_between(tempos, precos - 0.1 * precos, precos + 0.1 * precos, color='orange', alpha=0.3, label='Intervalo de Confiança 10% - 90%')
+
+plt.xscale('log')
+plt.xlabel('Tempo')
+plt.ylabel('Preço')
+plt.title('Evolução do Anel de Kac e Série Financeira com Dois Alvos')
+plt.legend()
+plt.grid(True)
+plt.show()
+
+# Printar os pontos marcados para referência
+print("Posições dos pontos marcados:")
+print(np.where(pontos_marcados == 1)[0])
