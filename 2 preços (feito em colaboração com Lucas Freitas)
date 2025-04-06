@@ -1,0 +1,86 @@
+#@title 2 preços
+#@markdown entre com um preço inicial e um final, e ele vai fazer a transição
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Primeiro, definiremos as nossas três variáveis.
+N = 3000  # Número de bolas (ou partículas).
+M = 30    # Número de pontos marcados.
+passos_de_tempo = 1500  # Número de passos de tempo, definidos nos inteiros.
+
+# Inicialização do estado do anel de Kac, que como sabemos possui todas as bolas sendo brancas, de forma que:
+# +1 para bolas brancas; -1 para bolas pretas
+eta = np.ones(N)  # eta é a função que define o estado do anel de Kac
+
+# Cria a array "pontos_marcos", de tamanho "N" e com "M" pontos cujo valor é 1, que serão os pontos marcados, e "N-M" pontos não marcados, de valor 0.
+# Além disso, faz-se a distribuição aleatória dos pontos marcados
+pontos_marcados = np.zeros(N)
+pontos_marcados[:M] = 1
+np.random.shuffle(pontos_marcados)  # randomiza a distribuição dos pontos marcados
+
+# Definiremos a função que determina a evolução do anel de Kac
+def evol_anel_kac(N, M, passos_de_tempo, eta, pontos_marcados):
+    tempos = np.arange(passos_de_tempo)  # Defina array tempos, que vai de 0 até "passos_de_tempo - 1"
+    delta_t = np.zeros(passos_de_tempo)  # Defina delta, que é a array que armazena a média do estado "eta" para cada tempo possível
+
+    # Evolução macroscópica do modelo
+    mu = M / N
+    evolucao_macro = (1 - 2 * mu) ** tempos
+
+    # Evolução microscópica do modelo
+    for t in range(passos_de_tempo):
+        novo_eta = np.zeros_like(eta)  # Devio a atualização de tempo, defina "novo_eta", que é um novo array cujo armazena o estado atualizado das bolas num tempo específico
+        for k in range(N):
+            novo_eta[k] = pontos_marcados[k] * -eta[k - 1] + (1 - pontos_marcados[k]) * eta[k - 1]
+        eta = novo_eta  # Atualiza eta com o novo estado, determinado pelo novo_eta
+        delta_t[t] = np.mean(eta)  # Calcula a média de eta e armazena em delta
+
+    return tempos, evolucao_macro, delta_t
+
+# Função para mapear a evolução de Kac para uma série de preços
+def map_to_prices(delta_t, preco_inicial, preco_final):
+    """Mapeia a evolução de Kac (delta_t) para uma série financeira com preços."""
+    # Normaliza delta_t entre [0, 1] se necessário
+    delta_min, delta_max = np.min(delta_t), np.max(delta_t)
+    delta_normalized = (delta_t - delta_min) / (delta_max - delta_min)
+
+    # Mapear a série normalizada para o intervalo [preco_inicial, preco_final]
+    prices = preco_inicial + delta_normalized * (preco_final - preco_inicial)
+    return prices
+
+# Parâmetros financeiros
+preco_inicial = 100  # Preço inicial (pode ser alterado pelo usuário)
+preco_final = 110    # Preço final (pode ser alterado pelo usuário)
+
+# Executa a função de evolução do anel de Kac
+tempos, evolucao_macro, delta_t = evol_anel_kac(N, M, passos_de_tempo, eta, pontos_marcados)
+
+# Mapeia a evolução de Kac para os preços
+precos = map_to_prices(delta_t, preco_final, preco_inicial)
+
+# Mapeia a evolução macro também para o intervalo de preços
+evolucao_macro_precos = map_to_prices(evolucao_macro,preco_final, preco_inicial)
+
+# Plotando os resultados
+plt.figure(figsize=(20, 14))
+
+# Plotar a evolução macro do anel de Kac mapeada para os preços
+plt.plot(tempos, evolucao_macro_precos, label=r'Evolução macro (mapeada para preços)', color='blue')
+
+# Plotar a série de preços simulada
+plt.plot(tempos, precos, label=f'Série financeira: Preço de {preco_inicial} para {preco_final}', color='orange', alpha=0.7)
+
+# Adicionar intervalo de confiança ao redor da série financeira
+plt.fill_between(tempos, precos - 0.1 * precos, precos + 0.1 * precos, color='orange', alpha=0.3, label='Intervalo de Confiança 10% - 90%')
+
+plt.xscale('log')
+plt.xlabel('Tempo')
+plt.ylabel('Preço')
+plt.title('Evolução do Anel de Kac e Série Financeira')
+plt.legend()
+plt.grid(True)
+plt.show()
+
+# Printar os pontos marcados para referência
+print("Posições dos pontos marcados:")
+print(np.where(pontos_marcados == 1)[0])  # Printa os pontos que estão marcados
