@@ -1,0 +1,85 @@
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Primeiro, definiremos as nossas três variáveis.
+N = 3000  # Número de bolas (ou partículas).
+M = 30    # Número de pontos marcados.
+passos_de_tempo = 1500  # Número de passos de tempo, definidos nos inteiros.
+
+# Inicialização do estado do anel de Kac
+eta = np.ones(N)  # eta é a função que define o estado do anel de Kac
+
+# Cria a array "pontos_marcos"
+pontos_marcados = np.zeros(N)
+pontos_marcados[:M] = 1
+np.random.shuffle(pontos_marcados)  # randomiza a distribuição dos pontos marcados
+
+# Função que determina a evolução do anel de Kac
+def evol_anel_kac(N, M, passos_de_tempo, eta, pontos_marcados):
+    tempos = np.arange(passos_de_tempo)
+    delta_t = np.zeros(passos_de_tempo)
+    mu = M / N
+    evolucao_macro = (1 - 2 * mu) ** tempos
+
+    for t in range(passos_de_tempo):
+        novo_eta = np.zeros_like(eta)
+        for k in range(N):
+            novo_eta[k] = pontos_marcados[k] * -eta[k - 1] + (1 - pontos_marcados[k]) * eta[k - 1]
+        eta = novo_eta
+        delta_t[t] = np.mean(eta)
+
+    return tempos, evolucao_macro, delta_t
+
+# Função para mapear a evolução de Kac para uma série de preços com múltiplos alvos
+def map_to_multi_targets(delta_t, precos_alvo, passos_de_tempo):
+    """Mapeia a evolução de Kac (delta_t) para uma série financeira com múltiplos preços-alvo."""
+    delta_min, delta_max = np.min(delta_t), np.max(delta_t)
+    delta_normalized = (delta_t - delta_min) / (delta_max - delta_min)
+
+    num_targets = len(precos_alvo)
+    intervalos = np.linspace(0, passos_de_tempo, num_targets + 1, dtype=int)
+
+    precos = np.zeros(passos_de_tempo)
+    for i in range(num_targets):
+        preco_inicial = precos_alvo[i]
+        preco_final = precos_alvo[i + 1] if i + 1 < num_targets else precos_alvo[i]  # Manter o último valor
+        for t in range(intervalos[i], intervalos[i + 1]):
+            precos[t] = preco_inicial + delta_normalized[t] * (preco_final - preco_inicial)
+
+    return precos
+
+# Parâmetros financeiros - Lista de preços-alvo (targets)
+precos_alvo = [100, 110, 100, 110]  # Lista de preços-alvo
+
+# Executa a função de evolução do anel de Kac
+tempos, evolucao_macro, delta_t = evol_anel_kac(N, M, passos_de_tempo, eta, pontos_marcados)
+
+# Mapeia a evolução de Kac para a série de preços com múltiplos alvos
+precos = map_to_multi_targets(delta_t, precos_alvo, passos_de_tempo)
+
+# Mapeia a evolução macro também para o intervalo de preços (usando o primeiro e último alvo como referência)
+evolucao_macro_precos = map_to_multi_targets(evolucao_macro, precos_alvo, passos_de_tempo)
+
+# Plotando os resultados
+plt.figure(figsize=(20, 14))
+
+# Plotar a evolução macro do anel de Kac mapeada para os preços
+plt.plot(tempos, evolucao_macro_precos, label=r'Evolução macro (mapeada para preços)', color='blue')
+
+# Plotar a série de preços simulada
+plt.plot(tempos, precos, label=f'Série financeira: {precos_alvo}', color='orange', alpha=0.7)
+
+# Adicionar intervalo de confiança ao redor da série financeira
+plt.fill_between(tempos, precos - 0.1 * precos, precos + 0.1 * precos, color='orange', alpha=0.3, label='Intervalo de Confiança 10% - 90%')
+
+plt.xscale('log')
+plt.xlabel('Tempo')
+plt.ylabel('Preço')
+plt.title('Evolução do Anel de Kac e Série Financeira com Múltiplos Targets')
+plt.legend()
+plt.grid(True)
+plt.show()
+
+# Printar os pontos marcados para referência
+print("Posições dos pontos marcados:")
+print(np.where(pontos_marcados == 1)[0])  # Printa os pontos que estão marcados
