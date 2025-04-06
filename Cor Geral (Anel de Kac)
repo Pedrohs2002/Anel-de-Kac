@@ -1,0 +1,57 @@
+## O seguinte código busca apresentar o comportamento da chamada "cor geral" do Anel de Kac. A depender de como os pontos marcados forem distribuídos, os gráficos podem variar.
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+## Primeiro, definiremos as nossas três variáveis.
+N = 3000  # Número de bolas (ou partículas).
+M = 30    # Número de pontos marcados.
+passos_de_tempo = 1500  # Número de passos de tempo, definidos nos inteiros.
+
+## Inicialização do estado do anel de Kac, que como sabemos possui todas as bolas sendo brancas, de forma que:
+# +1 para bolas brancas; -1 para bolas pretas
+eta = np.ones(N) #eta é a função que define o estado do anel de Kac
+
+## Cria a array "pontos_marcos", de tamanho "N" e com "M" pontos cujo valor é 1, que serão os pontos marcados, e "N-M" pontos não marcados, de valor 0.
+#Além disso, faz-se a distribuição aleatória dos pontos marcados
+pontos_marcados = np.zeros(N)
+pontos_marcados[:M] = 1
+np.random.shuffle(pontos_marcados) #randomiza a distribuição dos pontos marcados
+
+## Definiremos a função que determina a evolução do anel de Kac
+def evol_anel_kac(N, M, passos_de_tempo, eta, pontos_marcados):
+    tempos = np.arange(passos_de_tempo) #Defina array tempos, que vai de 0 até "passos_de_tempo_ - 1"
+    delta_t = np.zeros(passos_de_tempo) #Definta delta, que é a array que armazena a média do estado "eta" para cada tempo possível
+
+    ## Evolução macroscópica do modelo
+    mu = M / N
+    evolucao_macro = (1 - 2 * mu)**tempos
+
+    ## Evolução microscópica do modelo
+    for t in range(passos_de_tempo):
+        novo_eta = np.zeros_like(eta) #Devio a atualização de tempo, defina "novo_eta", que é um novo array cujo armazena o estado atualizado das bolas num tempo específico
+        for k in range(N):
+            novo_eta[k] = pontos_marcados[k] * -eta[k-1] + (1 - pontos_marcados[k]) * eta[k-1]
+        eta = novo_eta #Atualiza eta com o novo estado, determinado pelo novo_eta
+        delta_t[t] = np.mean(eta) #Calcula a média de eta e armanzena em delta
+
+    return tempos, evolucao_macro, delta_t
+
+## Executa a função de evolução
+tempos, evolucao_macro, delta_t = evol_anel_kac(N, M, passos_de_tempo, eta, pontos_marcados)
+
+plt.figure(figsize=(20, 14))
+plt.plot(tempos, evolucao_macro, label=r'Evolução macro, definida por $(1 - 2\mu)^t$', color='blue')
+plt.plot(tempos, delta_t, label=r'Média do estado, definida por $\delta(t)$', color='orange', alpha=0.7)
+plt.fill_between(tempos, delta_t - 0.1 * delta_t, delta_t + 0.1 * delta_t, color='orange', alpha=0.3, label='Intervalo de Confiança 10% - 90%')
+
+plt.xscale('log')
+plt.xlabel('Tempo')
+plt.ylabel('Estado')
+plt.title('Evolução do Anel de Kac')
+plt.legend()
+plt.grid(True)
+plt.show()
+
+print("Posições dos pontos marcados:")
+print(np.where(pontos_marcados == 1)[0]) #Printa os pontos que estão marcados
